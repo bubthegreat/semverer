@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/__init__.py
+src/semverer/__init__.py
+src/semverer/cli.py
+src/semverer/main.py
+src/semverer.egg-info/PKG-INFO
+src/semverer.egg-info/SOURCES.txt
+src/semverer.egg-info/dependency_links.txt
+src/semverer.egg-info/entry_points.txt
+src/semverer.egg-info/requires.txt
+src/semverer.egg-info/top_level.txt

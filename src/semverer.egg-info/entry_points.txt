@@ -1,0 +1,2 @@
+[console_scripts]
+semverer = semverer.cli:app

@@ -1,0 +1,9 @@
+Metadata-Version: 2.2
+Name: semverer
+Version: 0.4.0
+Summary: Add your description here
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: semver>=3.0.4
+Requires-Dist: toml>=0.10.2
+Requires-Dist: typer>=0.15.1
