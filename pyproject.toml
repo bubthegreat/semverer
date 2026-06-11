@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "semverer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Automatic semver bumps for Python packages, driven by AST-level public API change detection"
 readme = "README.md"
 license = "MIT"
@@ -66,21 +66,27 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 package = "src/semverer"
 
 [tool.semverer.baseline]
-version = "0.1.0"
+version = "0.2.0"
 python = "3.14"
 
 [tool.semverer.baseline.hashes]
 "semverer/__init__.py" = "sha256:e34770f649edad5ff3ea8822b2894c8d5da89aa10735ad0a5cacf0bed4aeff39"
-"semverer/cli.py" = "sha256:67f88b8559705ba88aa88b1c64aaabb880d883c99c4ed5dbbd1c703238734b17"
+"semverer/audit.py" = "sha256:92ced04a8a9b878570c17c254eee3f32e4c3a72be3ad9b09239fc13448c4aac2"
+"semverer/cli.py" = "sha256:c54a6b68b2c7d665f8b17030e472580e6f557c51fe7eb774ab2a1065239c025e"
 "semverer/comparator.py" = "sha256:b3379dfcc32c9b86c64fb9a55fd41dea8993afa87eece6a9e6ccfaeca8f19b32"
-"semverer/extractor.py" = "sha256:e6a5a64ea2a1d76be66b9da78e1b5d33b77bbb5277eb27a0fa3cfaa5cff29e7c"
+"semverer/extractor.py" = "sha256:eeae88186ecdb6fe574a4b1df26a078a93c9dc44b154e5706dc946f62acb879d"
 "semverer/models.py" = "sha256:da6ffe90c177f1a91585a208b58eee38b8e53f4b20cba55f0e5ec52b59cec42a"
-"semverer/skill.py" = "sha256:cf83e0e347d2ee7f0c7232e706f5a6d95db0e87eab8f5e159ca1ff0ff4f2eee6"
+"semverer/skill.py" = "sha256:50f7a27e082acd072198a6e1be1a3e4ae37963793ae1d92cbc7f9f8d7aa3886f"
 "semverer/storage.py" = "sha256:98dc7d1735bd54b4686cd531b4b42d66aaff2bd518cf55939cb61a001f9118b8"
 "semverer/versioning.py" = "sha256:5ba9dc6d974cd5008de8af33f9475ea56e5f9f9b1bad7143fa891bc7b66bfea2"
 
 [tool.semverer.baseline.api]
+"semverer/audit.py::AuditError" = "class AuditError(Exception)"
+"semverer/audit.py::Snapshot" = "class Snapshot"
+"semverer/audit.py::TransitionReport" = "class TransitionReport"
+"semverer/audit.py::audit_repository" = "def audit_repository(start, since=..., tags_only=...)"
 "semverer/cli.py::ProjectContext" = "class ProjectContext"
+"semverer/cli.py::audit" = "def audit(since=..., tags_only=...)"
 "semverer/cli.py::check" = "def check(package_path=..., pyproject=...)"
 "semverer/cli.py::init" = "def init(package_path=..., pyproject=...)"
 "semverer/cli.py::skill_install" = "def skill_install(user=...)"
@@ -89,6 +95,7 @@ python = "3.14"
 "semverer/comparator.py::compare" = "def compare(old_api, new_api, old_hashes, new_hashes, *, compare_hashes=...)"
 "semverer/extractor.py::extract_module_api" = "def extract_module_api(tree)"
 "semverer/extractor.py::extract_package" = "def extract_package(package_path)"
+"semverer/extractor.py::extract_sources" = "def extract_sources(sources)"
 "semverer/extractor.py::function_sig" = "def function_sig(node)"
 "semverer/extractor.py::hash_module" = "def hash_module(tree)"
 "semverer/extractor.py::is_public" = "def is_public(name)"

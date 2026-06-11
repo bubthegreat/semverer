@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -77,6 +78,18 @@ class Project:
         data = self.read_pyproject()
         data["project"]["version"] = version
         self.pyproject.write_text(tomlkit.dumps(data))
+
+    def git(self, *args: str) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=self.root, capture_output=True, text=True, check=True
+        )
+        return result.stdout
+
+    def git_init(self) -> None:
+        self.git("init", "-q")
+        self.git("config", "user.email", "test@test")
+        self.git("config", "user.name", "test")
+        self.git("config", "commit.gpgsign", "false")
 
 
 def make_project(

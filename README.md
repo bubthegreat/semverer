@@ -96,6 +96,27 @@ needed / files modified, `2` configuration error.
 If you bump the version by hand, semverer respects it: a manual bump at least
 as large as the required severity is accepted instead of bumped again.
 
+## Auditing existing history
+
+```bash
+semverer audit                      # every commit on the current branch
+semverer audit --tags-only          # only published v* release tags
+semverer audit --since v1.4.0      # from an adoption point forward
+```
+
+`audit` replays your git history: for each pair of consecutive commits (or
+tags), it extracts both API snapshots directly from the git blobs and checks
+that the recorded version moved at least as far as the rules require. Under-
+bumps are violations (exit 1); over-bumps are allowed and noted. Run it
+before `init` on an existing project to see how honest your versions have
+been — and run it in CI like this repo does (`semverer audit --tags-only`),
+where semverer's own published tags are its permanent integration test.
+
+```
+  v0.1.0..v0.2.0: required minor, version 0.1.0 -> 0.2.0  OK
+semverer: audit passed (1 OK, 0 skipped)
+```
+
 ## As a pre-commit hook
 
 ```yaml

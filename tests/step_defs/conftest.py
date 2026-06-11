@@ -46,6 +46,26 @@ def project_with_dynamic_version(tmp_path, monkeypatch) -> Project:
     return make_project(tmp_path, monkeypatch, dynamic=True)
 
 
+@given("a git-tracked project", target_fixture="project")
+def git_tracked_project(tmp_path, monkeypatch) -> Project:
+    project = make_project(tmp_path, monkeypatch)
+    project.git_init()
+    return project
+
+
+@given(parsers.parse('a commit at version "{version}" with module "{name}":'))
+def commit_at_version(project: Project, version: str, name: str, docstring: str):
+    project.set_version(version)
+    project.write_module(name, docstring)
+    project.git("add", "-A")
+    project.git("commit", "-q", "-m", f"version {version}")
+
+
+@given(parsers.parse('the commit is tagged "{tag}"'))
+def commit_tagged(project: Project, tag: str):
+    project.git("tag", tag)
+
+
 @given("the baseline was hashed under a different Python version")
 def baseline_under_different_python(project: Project):
     doc = project.read_pyproject()

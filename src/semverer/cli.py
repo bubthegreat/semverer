@@ -10,6 +10,7 @@ import typer
 from tomlkit import TOMLDocument
 
 from semverer import skill, storage
+from semverer.audit import AuditError, audit_repository
 from semverer.comparator import compare
 from semverer.extractor import extract_package, running_python
 from semverer.models import Change, Severity
@@ -227,6 +228,32 @@ def init(
         f"semverer: baseline established for version {context.version}: "
         f"{len(api)} public symbols across {len(hashes)} modules"
     )
+
+
+@app.command()
+def audit(
+    since: str | None = typer.Option(
+        None, "--since", help="Audit transitions starting from this ref (e.g. the adoption tag)."
+    ),
+    tags_only: bool = typer.Option(
+        False, "--tags-only", help="Audit only semver release tags (v*) instead of every commit."
+    ),
+) -> None:
+    """Verify the git history's recorded versions obey the semver rules."""
+    try:
+        reports = audit_repository(Path.cwd(), since=since, tags_only=tags_only)
+    except AuditError as error:
+        raise _fail(str(error)) from None
+
+    for report in reports:
+        typer.echo(f"  {report.old_ref}..{report.new_ref}: {report.line}")
+    violations = sum(1 for report in reports if report.violation)
+    skipped = sum(1 for report in reports if report.skipped)
+    passed = len(reports) - violations - skipped
+    if violations:
+        typer.echo(f"semverer: audit failed: {violations} violation(s), {passed} OK")
+        raise typer.Exit(1)
+    typer.echo(f"semverer: audit passed ({passed} OK, {skipped} skipped)")
 
 
 @skill_app.command("install")

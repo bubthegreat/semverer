@@ -29,8 +29,7 @@ def extract_package(package_path: Path) -> tuple[dict[str, str], dict[str, str]]
     """
     package_path = package_path.resolve()
     root = package_path.parent
-    api: dict[str, str] = {}
-    hashes: dict[str, str] = {}
+    sources: dict[str, str] = {}
 
     for file in sorted(package_path.rglob("*.py")):
         relative_parts = file.relative_to(package_path).parts
@@ -39,9 +38,26 @@ def extract_package(package_path: Path) -> tuple[dict[str, str], dict[str, str]]
         module_key = file.relative_to(root).as_posix()
         # utf-8-sig: tolerate a BOM (some Windows editors add one); plain
         # utf-8 files decode identically under it.
-        tree = ast.parse(file.read_text(encoding="utf-8-sig"), filename=str(file))
+        sources[module_key] = file.read_text(encoding="utf-8-sig")
+
+    return extract_sources(sources)
+
+
+def extract_sources(sources: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
+    """Snapshot a package given as in-memory sources keyed by module key.
+
+    This is the filesystem-free core of :func:`extract_package`; the audit
+    command uses it to snapshot historical commits directly from git blobs
+    without checking them out.
+    """
+    api: dict[str, str] = {}
+    hashes: dict[str, str] = {}
+
+    for module_key in sorted(sources):
+        tree = ast.parse(sources[module_key], filename=module_key)
         hashes[module_key] = hash_module(tree)
-        if file.name.startswith("_") and file.name != "__init__.py":
+        name = module_key.rsplit("/", 1)[-1]
+        if name.startswith("_") and name != "__init__.py":
             continue
         for symbol, signature in extract_module_api(tree).items():
             api[f"{module_key}::{symbol}"] = signature

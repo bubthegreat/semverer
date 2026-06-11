@@ -30,6 +30,9 @@ semver bump from changes to the package's public API (detected via AST).
   pyproject.toml; stage the file and continue.
 - `semverer init` — establish a baseline for the current version
   (first-time setup, or after intentionally rewriting history).
+- `semverer audit [--tags-only] [--since REF]` — replay git history and
+  verify recorded versions satisfied the severity rules; use it to assess
+  a project before adopting semverer.
 
 ## How to work in a semverer-managed package
 
