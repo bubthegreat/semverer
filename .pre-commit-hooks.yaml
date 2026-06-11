@@ -1,0 +1,14 @@
+- id: semverer
+  name: semverer (auto version bump)
+  description: Bump the project version based on detected public API changes.
+  entry: semverer update
+  language: python
+  files: \.py$
+  pass_filenames: false
+- id: semverer-check
+  name: semverer (check only, no writes)
+  description: Fail if the project version does not reflect public API changes.
+  entry: semverer check
+  language: python
+  files: \.py$
+  pass_filenames: false

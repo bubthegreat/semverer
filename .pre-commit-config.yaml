@@ -1,0 +1,36 @@
+# Quality gates run first; fail_fast stops the chain on the first failure so
+# the semverer version bump can only happen once lint, types, and the full
+# test suite have all passed.
+fail_fast: true
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (lint, autofix)
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      - id: mypy
+        name: mypy (strict)
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: pytest
+        name: pytest (full suite incl. Gherkin specs)
+        entry: uv run pytest -q
+        language: system
+        files: \.(py|feature)$
+        pass_filenames: false
+      - id: semverer
+        name: semverer (auto version bump)
+        entry: uv run semverer update
+        language: system
+        files: \.py$
+        pass_filenames: false

@@ -1,14 +1,120 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "semverer"
-version = "3.0.0"
-description = "Add your description here"
+version = "0.1.0"
+description = "Automatic semver bumps for Python packages, driven by AST-level public API change detection"
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [ "semver>=3.0.4", "toml>=0.10.2", "typer>=0.15.1",]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Bub Taylor", email = "bubthegreat@gmail.com" }]
+requires-python = ">=3.12"
+keywords = ["semver", "versioning", "ast", "pre-commit", "release-automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Version Control",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "semver>=3.0.4",
+    "tomlkit>=0.13.2",
+    "typer>=0.15.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/bubthegreat/semverer"
+Issues = "https://github.com/bubthegreat/semverer/issues"
 
 [project.scripts]
 semverer = "semverer.cli:app"
 
-[tool.ast_inspector]
-api_signatures = "eyIvaG9tZS9idWIvRGV2ZWxvcG1lbnQvc2VtdmVyZXIvc3JjL3NlbXZlcmVyL21haW4ucHkiOiB7IkFTVFZlcnNpb25JbnNwZWN0b3IiOiB7Il9faW5pdF9fIjogImRlZiBfX2luaXRfXyhzZWxmLCBwYWNrYWdlX3BhdGgsIHB5cHJvamVjdF9maWxlLCBkcnlfcnVuKSIsICJsb2FkX3ZlcnNpb24iOiAiZGVmIGxvYWRfdmVyc2lvbihzZWxmKSIsICJzYXZlX3ZlcnNpb24iOiAiZGVmIHNhdmVfdmVyc2lvbihzZWxmLCBuZXdfdmVyc2lvbiwgY2hhbmdlcykiLCAibG9hZF9hcGlfc2lnbmF0dXJlcyI6ICJkZWYgbG9hZF9hcGlfc2lnbmF0dXJlcyhzZWxmKSIsICJleHRyYWN0X2FwaSI6ICJkZWYgZXh0cmFjdF9hcGkoc2VsZiwgZmlsZV9wYXRoKSIsICJnZXRfZnVuY3Rpb25fc2lnbmF0dXJlIjogImRlZiBnZXRfZnVuY3Rpb25fc2lnbmF0dXJlKHNlbGYsIG5vZGUpIiwgImdldF9jbGFzc19zaWduYXR1cmUiOiAiZGVmIGdldF9jbGFzc19zaWduYXR1cmUoc2VsZiwgbm9kZSkiLCAic2Nhbl9wYWNrYWdlIjogImRlZiBzY2FuX3BhY2thZ2Uoc2VsZikiLCAiZ2VuZXJhdGVfZGlmZiI6ICJkZWYgZ2VuZXJhdGVfZGlmZihzZWxmLCBvbGQsIG5ldykiLCAiZGV0ZWN0X2NoYW5nZXMiOiAiZGVmIGRldGVjdF9jaGFuZ2VzKHNlbGYsIG9sZF9zaWduYXR1cmVzLCBuZXdfc2lnbmF0dXJlcykiLCAiaW5jcmVtZW50X3ZlcnNpb24iOiAiZGVmIGluY3JlbWVudF92ZXJzaW9uKHNlbGYsIG1ham9yLCBtaW5vciwgcGF0Y2gpIiwgInJ1biI6ICJkZWYgcnVuKHNlbGYpIn0sICJfX2luaXRfXyI6ICJkZWYgX19pbml0X18oc2VsZiwgcGFja2FnZV9wYXRoLCBweXByb2plY3RfZmlsZSwgZHJ5X3J1bikiLCAibG9hZF92ZXJzaW9uIjogImRlZiBsb2FkX3ZlcnNpb24oc2VsZikiLCAic2F2ZV92ZXJzaW9uIjogImRlZiBzYXZlX3ZlcnNpb24oc2VsZiwgbmV3X3ZlcnNpb24sIGNoYW5nZXMpIiwgImxvYWRfYXBpX3NpZ25hdHVyZXMiOiAiZGVmIGxvYWRfYXBpX3NpZ25hdHVyZXMoc2VsZikiLCAiZXh0cmFjdF9hcGkiOiAiZGVmIGV4dHJhY3RfYXBpKHNlbGYsIGZpbGVfcGF0aCkiLCAiZ2V0X2Z1bmN0aW9uX3NpZ25hdHVyZSI6ICJkZWYgZ2V0X2Z1bmN0aW9uX3NpZ25hdHVyZShzZWxmLCBub2RlKSIsICJnZXRfY2xhc3Nfc2lnbmF0dXJlIjogImRlZiBnZXRfY2xhc3Nfc2lnbmF0dXJlKHNlbGYsIG5vZGUpIiwgInNjYW5fcGFja2FnZSI6ICJkZWYgc2Nhbl9wYWNrYWdlKHNlbGYpIiwgImdlbmVyYXRlX2RpZmYiOiAiZGVmIGdlbmVyYXRlX2RpZmYoc2VsZiwgb2xkLCBuZXcpIiwgImRldGVjdF9jaGFuZ2VzIjogImRlZiBkZXRlY3RfY2hhbmdlcyhzZWxmLCBvbGRfc2lnbmF0dXJlcywgbmV3X3NpZ25hdHVyZXMpIiwgImluY3JlbWVudF92ZXJzaW9uIjogImRlZiBpbmNyZW1lbnRfdmVyc2lvbihzZWxmLCBtYWpvciwgbWlub3IsIHBhdGNoKSIsICJydW4iOiAiZGVmIHJ1bihzZWxmKSJ9LCAiL2hvbWUvYnViL0RldmVsb3BtZW50L3NlbXZlcmVyL3NyYy9zZW12ZXJlci9jbGkucHkiOiB7InVwZGF0ZSI6ICJkZWYgdXBkYXRlKHBhY2thZ2VfcGF0aCkiLCAiY2hlY2siOiAiZGVmIGNoZWNrKHBhY2thZ2VfcGF0aCkifX0="
-last_changes = [ "Changed signature of ASTVersionInspector in /home/bub/Development/semverer/src/semverer/main.py:\n", "Changed signature of __init__ in /home/bub/Development/semverer/src/semverer/main.py:\n", "Added generate_diff in /home/bub/Development/semverer/src/semverer/main.py", "Added update in /home/bub/Development/semverer/src/semverer/cli.py", "Added check in /home/bub/Development/semverer/src/semverer/cli.py", "Removed inspect from /home/bub/Development/semverer/src/semverer/cli.py", "Removed test from /home/bub/Development/semverer/src/semverer/cli.py", "Removed new from /home/bub/Development/semverer/src/semverer/cli.py",]
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pre-commit>=4.6.0",
+    "pytest>=8.3",
+    "pytest-bdd>=8.1",
+    "pytest-cov>=6.0",
+    "ruff>=0.15.16",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.semverer]
+package = "src/semverer"
+
+[tool.semverer.baseline]
+version = "0.1.0"
+python = "3.14"
+
+[tool.semverer.baseline.hashes]
+"semverer/__init__.py" = "sha256:e34770f649edad5ff3ea8822b2894c8d5da89aa10735ad0a5cacf0bed4aeff39"
+"semverer/cli.py" = "sha256:67f88b8559705ba88aa88b1c64aaabb880d883c99c4ed5dbbd1c703238734b17"
+"semverer/comparator.py" = "sha256:b3379dfcc32c9b86c64fb9a55fd41dea8993afa87eece6a9e6ccfaeca8f19b32"
+"semverer/extractor.py" = "sha256:e6a5a64ea2a1d76be66b9da78e1b5d33b77bbb5277eb27a0fa3cfaa5cff29e7c"
+"semverer/models.py" = "sha256:da6ffe90c177f1a91585a208b58eee38b8e53f4b20cba55f0e5ec52b59cec42a"
+"semverer/skill.py" = "sha256:cf83e0e347d2ee7f0c7232e706f5a6d95db0e87eab8f5e159ca1ff0ff4f2eee6"
+"semverer/storage.py" = "sha256:98dc7d1735bd54b4686cd531b4b42d66aaff2bd518cf55939cb61a001f9118b8"
+"semverer/versioning.py" = "sha256:5ba9dc6d974cd5008de8af33f9475ea56e5f9f9b1bad7143fa891bc7b66bfea2"
+
+[tool.semverer.baseline.api]
+"semverer/cli.py::ProjectContext" = "class ProjectContext"
+"semverer/cli.py::check" = "def check(package_path=..., pyproject=...)"
+"semverer/cli.py::init" = "def init(package_path=..., pyproject=...)"
+"semverer/cli.py::skill_install" = "def skill_install(user=...)"
+"semverer/cli.py::update" = "def update(package_path=..., pyproject=...)"
+"semverer/comparator.py::classify_signature_change" = "def classify_signature_change(old, new)"
+"semverer/comparator.py::compare" = "def compare(old_api, new_api, old_hashes, new_hashes, *, compare_hashes=...)"
+"semverer/extractor.py::extract_module_api" = "def extract_module_api(tree)"
+"semverer/extractor.py::extract_package" = "def extract_package(package_path)"
+"semverer/extractor.py::function_sig" = "def function_sig(node)"
+"semverer/extractor.py::hash_module" = "def hash_module(tree)"
+"semverer/extractor.py::is_public" = "def is_public(name)"
+"semverer/extractor.py::parse_signature" = "def parse_signature(text)"
+"semverer/extractor.py::render_class" = "def render_class(node)"
+"semverer/extractor.py::render_function" = "def render_function(node)"
+"semverer/extractor.py::running_python" = "def running_python()"
+"semverer/models.py::Change" = "class Change"
+"semverer/models.py::Change.module" = "def module(self)"
+"semverer/models.py::ClassSig" = "class ClassSig"
+"semverer/models.py::FunctionSig" = "class FunctionSig"
+"semverer/models.py::FunctionSig.has_kwarg" = "def has_kwarg(self)"
+"semverer/models.py::FunctionSig.has_vararg" = "def has_vararg(self)"
+"semverer/models.py::Param" = "class Param"
+"semverer/models.py::ParamKind" = "class ParamKind(enum.Enum)"
+"semverer/models.py::Severity" = "class Severity(enum.IntEnum)"
+"semverer/skill.py::install" = "def install(base_dir)"
+"semverer/storage.py::Baseline" = "class Baseline"
+"semverer/storage.py::find_pyproject" = "def find_pyproject(start)"
+"semverer/storage.py::load" = "def load(pyproject)"
+"semverer/storage.py::read_baseline" = "def read_baseline(doc)"
+"semverer/storage.py::read_package_config" = "def read_package_config(doc)"
+"semverer/storage.py::read_version" = "def read_version(doc)"
+"semverer/storage.py::write_state" = "def write_state(pyproject, doc, version, baseline)"
+"semverer/versioning.py::bump" = "def bump(version, severity)"
+"semverer/versioning.py::manual_bump_severity" = "def manual_bump_severity(baseline_version, current_version)"
+"semverer/versioning.py::next_version" = "def next_version(baseline_version, current_version, required)"
+[tool.ruff.lint.per-file-ignores]
+"src/semverer/cli.py" = ["B008"]
