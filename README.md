@@ -1,5 +1,13 @@
 # semverer
 
+[![CI](https://github.com/bubthegreat/semverer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bubthegreat/semverer/actions/workflows/ci.yml)
+[![Publish](https://github.com/bubthegreat/semverer/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/bubthegreat/semverer/actions/workflows/publish.yml)
+[![PyPI](https://img.shields.io/pypi/v/semverer)](https://pypi.org/project/semverer/)
+[![Python versions](https://img.shields.io/pypi/pyversions/semverer)](https://pypi.org/project/semverer/)
+[![License: MIT](https://img.shields.io/pypi/l/semverer)](LICENSE)
+[![Checked with mypy](https://img.shields.io/badge/mypy-strict-blue)](https://mypy-lang.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 Automatic [semantic versioning](https://semver.org/) for Python packages.
 semverer inspects your package's AST, compares its **public API** against a
 stored baseline, and bumps the version in `pyproject.toml` accordingly — so
