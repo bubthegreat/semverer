@@ -153,6 +153,7 @@ Python code in a semverer-managed package.
 
 ```bash
 uv sync --all-groups
+uv run pre-commit install   # one-time: makes git commit run the hook chain
 uv run pytest
 ```
 
