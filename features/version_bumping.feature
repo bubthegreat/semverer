@@ -236,7 +236,7 @@ Feature: Version bumping based on detected API changes
       | def f(a): return 1      | def f(a): return 2         | 1.0.1   |
       | def f(*args): return 1  | def f(*items): return 1    | 1.0.1   |
 
-  Scenario Outline: Relaxed bumps for unstable (0.x and pre-release) versions
+  Scenario Outline: Unstable version handling
     Given a project at version "<start>"
     And a module "api.py" with source "<before>"
     And a baseline has been established
@@ -252,9 +252,10 @@ Feature: Version bumping based on detected API changes
       | 0.0.3 | def f(a): ... | def f(a, b): ...   | 0.1.0   |
       | 0.0.3 | def f(a): ... | def f(a, b=1): ... | 0.0.4   |
 
-    Examples: Pre-release and dev versions only advance their counter
-      | start        | before        | after            | version      |
-      | 1.0.0rc1     | def f(a): ... | def f(a, b): ... | 1.0.0rc2     |
-      | 1.0.0rc1     | def f(a): ... | def f(a, b=1):...| 1.0.0rc2     |
-      | 1.0.0a1      | def f(a): ... | def f(a, b): ... | 1.0.0a2      |
-      | 1.0.0.dev1   | def f(a): ... | def f(a, b): ... | 1.0.0.dev2   |
+    Examples: Pre-release versions bump from their base release, never the counter
+      | start        | before        | after              | version |
+      | 1.4.3rc1     | def f(a): ... | def f(a): return 9 | 1.4.4   |
+      | 1.0.0rc1     | def f(a): ... | def f(a, b=1): ... | 1.1.0   |
+      | 1.0.0rc1     | def f(a): ... | def f(a, b): ...   | 2.0.0   |
+      | 1.0.0a1      | def f(a): ... | def f(a, b): ...   | 2.0.0   |
+      | 1.0.0.dev1   | def f(a): ... | def f(a, b): ...   | 2.0.0   |

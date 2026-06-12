@@ -192,6 +192,50 @@ class TestClassic:
         assert targets[0].package_dirs[0].name == "solo"
 
 
+# --- Bounded discovery: top level and exactly one level deep -----------------
+
+
+def one_deep_project(root: Path, name: str) -> None:
+    write(
+        root / name / "pyproject.toml",
+        f'[project]\nname = "{name}"\nversion = "1.0.0"\n\n'
+        f'[tool.semverer]\npackage = "src/{name}"\n',
+    )
+    write(root / name / "src" / name / "__init__.py", "def f(a): ...\n")
+
+
+class TestOneDeepDiscovery:
+    def test_projects_one_level_down_are_found(self, tmp_path):
+        # A polyglot monorepo root with no pyproject of its own.
+        one_deep_project(tmp_path, "alpha")
+        one_deep_project(tmp_path, "beta")
+        write(tmp_path / "frontend" / "package.json", "{}\n")  # other-language member
+        targets = discover(tmp_path)
+        assert {t.name for t in targets} == {"alpha", "beta"}
+
+    def test_two_levels_down_is_out_of_scope(self, tmp_path):
+        one_deep_project(tmp_path / "nested", "deep")
+        with pytest.raises(DiscoveryError, match="one level deep"):
+            discover(tmp_path)
+
+    def test_nothing_found_gives_the_specify_it_message(self, tmp_path):
+        write(tmp_path / "README.md", "not a python repo\n")
+        with pytest.raises(DiscoveryError, match="specify the project"):
+            discover(tmp_path)
+
+    def test_versionless_pyprojects_are_not_clear_packages(self, tmp_path):
+        # A tooling-only pyproject (ruff config, no version) doesn't count.
+        write(tmp_path / "tools" / "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
+        with pytest.raises(DiscoveryError, match="no clear Python package"):
+            discover(tmp_path)
+
+    def test_tooling_only_root_pyproject_falls_through_to_one_deep(self, tmp_path):
+        write(tmp_path / "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
+        one_deep_project(tmp_path, "alpha")
+        targets = discover(tmp_path)
+        assert [t.name for t in targets] == ["alpha"]
+
+
 # --- Poetry (legacy [tool.poetry]) convention -------------------------------
 
 

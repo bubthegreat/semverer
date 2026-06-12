@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from packaging.version import InvalidVersion, Version
 
 from semverer import metadata, skill, storage
 from semverer.audit import AuditError, audit_repository
@@ -16,7 +15,7 @@ from semverer.files import hash_files
 from semverer.metadata import ProjectMetadata, compare_metadata
 from semverer.models import Change, Severity
 from semverer.storage import Baseline, ConfigError
-from semverer.versioning import next_version
+from semverer.versioning import canonical, next_version, parse_semver
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -41,11 +40,11 @@ def _fail(message: str) -> typer.Exit:
 
 def _require_semver(version: str, what: str, hint: str = "") -> None:
     try:
-        Version(version)
-    except InvalidVersion:
+        parse_semver(version)
+    except ValueError:
         raise _fail(
-            f"{what} {version!r} is not a valid PEP 440 version "
-            f"(e.g. 1.2.3, 1.2.3rc1, 1.2.3.post1){hint}"
+            f"{what} {version!r} does not follow the semver spec (MAJOR.MINOR.PATCH); "
+            f"start from a compliant version like 1.2.3, then semverer can manage it{hint}"
         ) from None
 
 
@@ -136,14 +135,15 @@ def _update_target(target: Target, label: str) -> int:
     baseline = _read_baseline(target)
 
     if baseline is None:
+        version = canonical(target.version)
         storage.write_state(
             target.pyproject,
             target.doc,
-            target.version,
-            Baseline(target.version, api, files, meta),
+            version,
+            Baseline(version, api, files, meta),
         )
         typer.echo(
-            f"semverer: {label}Initialized baseline for version {target.version} "
+            f"semverer: {label}Initialized baseline for version {version} "
             f"({len(api)} public symbols); stage pyproject.toml and retry the commit"
         )
         return _INITIALIZED
@@ -179,15 +179,16 @@ def _update_target(target: Target, label: str) -> int:
 
 def _init_target(target: Target, label: str) -> None:
     _require_semver(target.version, "project version")
+    version = canonical(target.version)  # move short releases onto MAJOR.MINOR.PATCH
     api, files, meta = _snapshot(target)
     storage.write_state(
         target.pyproject,
         target.doc,
-        target.version,
-        Baseline(target.version, api, files, meta),
+        version,
+        Baseline(version, api, files, meta),
     )
     typer.echo(
-        f"semverer: {label}baseline established for version {target.version}: "
+        f"semverer: {label}baseline established for version {version}: "
         f"{len(api)} public symbols, {len(files)} files tracked"
     )
 

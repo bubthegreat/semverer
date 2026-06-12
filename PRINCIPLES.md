@@ -49,10 +49,15 @@ version a human already raised far enough.
 ## 5. Unstable versions relax; they never tighten
 
 §4: under 0.y.z anything may change. semverer demotes severity one level on
-0.x (major→minor, minor→patch) and never auto-increments the leading zero.
-During a pre-release or dev release, any change advances the pre/dev counter;
-only forward movement is enforced. Stable `>=1.0.0` versions get the full
-rules.
+0.x (major→minor, minor→patch) and never auto-increments the leading zero —
+reaching 1.0.0 *defines* the public API (§5) and is a human declaration, not
+a robot's. Stable `>=1.0.0` versions get the full rules.
+
+Pre-release, post, and dev suffixes are read as their **base** release and
+bumps always land on a real version: `1.4.3rc1` means base `1.4.3`, so a
+patch goes to `1.4.4` and a breaking change to `2.0.0`. semverer never
+iterates candidate counters; release-candidate mechanics belong to release
+managers, not version arithmetic.
 
 ## 6. The repository is not the package
 
@@ -77,6 +82,23 @@ A severity decision must be explainable in one sentence that points at one
 principle. When two designs detect the same thing, the one with less
 machinery wins.
 
+## 9. Bounded scope over best-effort guessing
+
+semverer requires what it can verify and refuses what it can't, with
+guidance instead of guesses:
+
+- **Versions must resolve to MAJOR.MINOR.PATCH.** Short releases are moved
+  onto the spec (`1.4` → `1.4.0`); epochs and 4+-component releases exit
+  gracefully with a message to comply with semver first.
+- **A package is something with a `pyproject.toml`.** That file is the
+  scope marker; only packages that have one get versioned.
+- **Discovery looks at the top level and exactly one level deep — never
+  further.** Deeper or unconventional layouts must be named explicitly
+  (`members`, a path argument, or `--pyproject`); when nothing is found,
+  the user is told to specify the project, not guessed at.
+
+Scope grows only by deliberate decision, never by accreting edge cases.
+
 ---
 
 ## The rules, derived
@@ -89,4 +111,6 @@ machinery wins.
 | Comments, formatting, docs, data, CI, build config | patch | 3 |
 | Dependencies, entry points, extras, requires-python, name | patch | 1, 3 |
 | Nothing changed | none | 4 |
-| Any of the above on 0.x / pre-release | one level relaxed | 5 |
+| Any of the above on 0.x | one level relaxed | 5 |
+| Any of the above on a pre-release (`1.4.3rc1`) | applied to the base (`1.4.3`) | 5 |
+| Version can't resolve to MAJOR.MINOR.PATCH | graceful exit with guidance | 9 |

@@ -34,7 +34,7 @@ from semverer.files import SELF_WRITTEN, is_ignored
 from semverer.metadata import ProjectMetadata, compare_metadata, read_metadata
 from semverer.models import Severity
 from semverer.storage import ConfigError
-from semverer.versioning import manual_bump_severity, relaxed_required
+from semverer.versioning import manual_bump_severity, parse_semver, relaxed_required
 
 
 class AuditError(Exception):
@@ -293,9 +293,12 @@ def _evaluate(old: Snapshot, new: Snapshot, label: str = "") -> TransitionReport
     if old.version is None or new.version is None:
         return TransitionReport(old.ref, new.ref, f"{label}skipped: missing version", skipped=True)
     try:
-        old_version, new_version = Version(str(old.version)), Version(str(new.version))
-    except InvalidVersion:
-        return TransitionReport(old.ref, new.ref, f"{label}skipped: invalid version", skipped=True)
+        old_version = parse_semver(str(old.version))
+        new_version = parse_semver(str(new.version))
+    except ValueError:
+        return TransitionReport(
+            old.ref, new.ref, f"{label}skipped: non-semver version", skipped=True
+        )
 
     versions = f"version {old.version} -> {new.version}"
     if new_version < old_version:

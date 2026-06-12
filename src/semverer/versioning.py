@@ -1,20 +1,20 @@
 """Version arithmetic: map change severity to the next project version.
 
-Versions are PEP 440 (``packaging.version.Version``) — the scheme pip and PyPI
-actually use — so pre-releases (``1.0.0rc1``), dev releases (``1.0.0.dev1``),
-post releases, epochs (``1!1.0.0``) and local versions (``1.0.0+local``) all
-parse. Two stability rules relax the bump so unstable projects behave the way
-the wider ecosystem expects:
+Versions are read with PEP 440 (what pip and PyPI speak) but must resolve to
+the semver spec's MAJOR.MINOR.PATCH before semverer will manage them: short
+releases are padded (``1.4`` -> ``1.4.0``), while epochs and releases with
+more than three components are rejected with guidance — complying with
+semver comes first (PRINCIPLES.md, bounded scope). Pre-release, post, and
+dev suffixes are tolerated and read as their **base** release, so bumps
+always land on a real version (``1.4.3rc1`` + patch -> ``1.4.4``); semverer
+never iterates candidate counters.
 
-- **0.x** (``major == 0``): the leading zero never auto-increments. Severity is
-  demoted one level (major→minor, minor→patch, patch→patch), the Cargo
-  "left-most non-zero" convention.
-- **pre-release / dev** (``Version.is_prerelease``): the base release is still
-  being stabilized, so any change just advances the pre/dev counter
-  (``rc1``→``rc2``); magnitude is ignored and only forward movement matters.
-
-:func:`relaxed_required` is the single source of truth for both rules; ``bump``
-and the history audit both consume it so they can never disagree.
+One stability rule relaxes the bump: under 0.x (SemVer §4, initial
+development) severity is demoted one level — major -> minor, minor -> patch —
+and the leading zero never auto-increments, because declaring ``1.0.0`` is a
+human act (§5). :func:`relaxed_required` is the single source of truth for
+that rule; ``bump`` and the history audit both consume it so they can never
+disagree.
 """
 
 from __future__ import annotations
@@ -30,19 +30,43 @@ _DEMOTE = {
 }
 
 
+def parse_semver(version: str) -> Version:
+    """Parse a version, requiring it to resolve to MAJOR.MINOR.PATCH.
+
+    Raises ``ValueError`` when it cannot: unparseable text, an epoch (semver
+    has no such concept), or a release with more than three components.
+    """
+    parsed = Version(version)  # InvalidVersion is a ValueError
+    if parsed.epoch:
+        raise ValueError(f"{version!r} has an epoch, which the semver spec does not define")
+    if len(parsed.release) > 3:
+        raise ValueError(f"{version!r} has more components than MAJOR.MINOR.PATCH")
+    return parsed
+
+
+def canonical(version: str) -> str:
+    """Pad a plain short release out to MAJOR.MINOR.PATCH (``1.4`` -> ``1.4.0``).
+
+    Versions carrying pre/post/dev/local suffixes are returned unchanged;
+    their first bump lands on a padded base release anyway.
+    """
+    parsed = parse_semver(version)
+    plain = not (parsed.is_prerelease or parsed.is_postrelease or parsed.local)
+    if plain and len(parsed.release) < 3:
+        return f"{parsed.major}.{parsed.minor}.{parsed.micro}"
+    return version
+
+
 def relaxed_required(version: str, required: Severity) -> Severity:
-    """The severity an unstable version actually needs to satisfy ``required``.
+    """The severity a 0.x version actually needs to satisfy ``required``.
 
     Stable ``>=1.0`` releases need the full severity; 0.x releases get one
-    level of demotion; pre-release/dev versions only ever need a counter
-    advance (PATCH). ``NONE`` always stays ``NONE``.
+    level of demotion and the leading zero never auto-increments. ``NONE``
+    always stays ``NONE``.
     """
     if required is Severity.NONE:
         return Severity.NONE
-    parsed = Version(version)
-    if parsed.is_prerelease:
-        return Severity.PATCH
-    if parsed.major == 0:
+    if parse_semver(version).major == 0:
         return _DEMOTE[required]
     return required
 
@@ -50,70 +74,22 @@ def relaxed_required(version: str, required: Severity) -> Severity:
 def bump(version: str, severity: Severity) -> str:
     """The next version after a change of the given severity.
 
-    Relaxation (see module docstring) is applied here, so callers get the
-    ecosystem-correct result without special-casing 0.x or pre-releases.
+    The bump applies to the **base** release — a pre-release/post/dev suffix
+    is read as the version it was heading for and then left behind — so the
+    result is always a plain MAJOR.MINOR.PATCH. The 0.x relaxation (see
+    module docstring) is applied here, so callers get the spec-correct
+    result without special-casing.
     """
     if severity is Severity.NONE:
         return version
-    parsed = Version(version)
-    if parsed.is_prerelease:
-        return _bump_prerelease(parsed)
-    return _bump_release(parsed, relaxed_required(version, severity))
-
-
-def _bump_prerelease(parsed: Version) -> str:
-    """Advance the least significant unstable counter of a pre/dev version.
-
-    A ``dev`` segment is the lowest, so when present it is what moves (keeping
-    any ``pre``/``post`` ahead of it). Otherwise the ``pre`` counter advances
-    and a now-stale ``post`` is dropped. ``local`` is build-local and never
-    carried across a bump.
-    """
-    if parsed.dev is not None:
-        return _format_pep440(
-            parsed.epoch, parsed.release, parsed.pre, parsed.post, parsed.dev + 1, None
-        )
-    assert parsed.pre is not None  # is_prerelease and dev is None ⇒ pre set
-    label, number = parsed.pre
-    return _format_pep440(parsed.epoch, parsed.release, (label, number + 1), None, None, None)
-
-
-def _bump_release(parsed: Version, severity: Severity) -> str:
-    """A clean release bump: drop every pre/post/dev/local segment."""
+    parsed = parse_semver(version)
+    effective = relaxed_required(version, severity)
     major, minor, micro = parsed.major, parsed.minor, parsed.micro
-    if severity is Severity.MAJOR:
-        release = (major + 1, 0, 0)
-    elif severity is Severity.MINOR:
-        release = (major, minor + 1, 0)
-    else:
-        release = (major, minor, micro + 1)
-    return _format_pep440(parsed.epoch, release, None, None, None, None)
-
-
-def _format_pep440(
-    epoch: int,
-    release: tuple[int, ...],
-    pre: tuple[str, int] | None,
-    post: int | None,
-    dev: int | None,
-    local: str | None,
-) -> str:
-    """Assemble a canonical PEP 440 string from components.
-
-    Re-parsing through :class:`Version` normalizes the result and fails loudly
-    if a malformed combination was ever constructed.
-    """
-    text = f"{epoch}!" if epoch else ""
-    text += ".".join(str(part) for part in release)
-    if pre is not None:
-        text += f"{pre[0]}{pre[1]}"
-    if post is not None:
-        text += f".post{post}"
-    if dev is not None:
-        text += f".dev{dev}"
-    if local is not None:
-        text += f"+{local}"
-    return str(Version(text))
+    if effective is Severity.MAJOR:
+        return f"{major + 1}.0.0"
+    if effective is Severity.MINOR:
+        return f"{major}.{minor + 1}.0"
+    return f"{major}.{minor}.{micro + 1}"
 
 
 def manual_bump_severity(baseline_version: str, current_version: str) -> Severity:
@@ -124,11 +100,11 @@ def manual_bump_severity(baseline_version: str, current_version: str) -> Severit
     is ``NONE``. Within the same base release any forward move (finishing a
     pre-release, a post/dev advance) counts as ``PATCH``.
     """
-    baseline = Version(baseline_version)
-    current = Version(current_version)
+    baseline = parse_semver(baseline_version)
+    current = parse_semver(current_version)
     if current <= baseline:
         return Severity.NONE
-    if current.epoch != baseline.epoch or current.major > baseline.major:
+    if current.major > baseline.major:
         return Severity.MAJOR
     if current.minor > baseline.minor:
         return Severity.MINOR
@@ -139,8 +115,8 @@ def next_version(baseline_version: str, current_version: str, required: Severity
     """The version the project should carry after the detected changes.
 
     A hand-made bump at least as large as the (relaxed) required severity is
-    respected rather than bumped again on top. Relaxation is keyed on the
-    current version's stability, mirroring how the audit judges a transition.
+    respected rather than bumped again on top — including a hand-chosen
+    pre-release like ``2.0.0rc1``, which semverer keeps rather than fights.
     """
     if required is Severity.NONE:
         return current_version

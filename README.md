@@ -111,17 +111,21 @@ needed / files modified, `2` configuration error.
 
 ### Version formats
 
-Versions are [PEP 440](https://peps.python.org/pep-0440/) — the scheme pip and
-PyPI use — so pre-releases (`1.2.3rc1`), dev releases (`1.2.3.dev1`), post
-releases (`1.2.3.post1`), epochs (`1!1.2.3`) and local versions (`1.2.3+local`)
-are all understood. Two relaxations match the wider ecosystem's expectations:
+Versions are read with [PEP 440](https://peps.python.org/pep-0440/) — the
+scheme pip and PyPI speak — but must resolve to the
+[semver spec](https://semver.org)'s `MAJOR.MINOR.PATCH` before semverer will
+manage them. Short releases are moved onto the spec (`1.4` → `1.4.0` at
+init); epochs (`1!1.2.3`) and releases with extra components (`1.2.3.4`)
+exit gracefully with a message to start from a compliant version first.
 
-- **`0.x` is unstable.** The leading zero never auto-increments; severity is
-  demoted one level (a breaking change bumps `0.3.0 → 0.4.0`, a feature/fix
-  bumps the patch). This is the Cargo "left-most non-zero" convention.
-- **Pre-releases stay pre-releases.** While the version is a pre-release or dev
-  release, any change just advances its counter (`1.0.0rc1 → 1.0.0rc2`); only
-  forward movement is enforced.
+- **`0.x` is unstable** (SemVer §4). The leading zero never auto-increments;
+  severity is demoted one level (a breaking change bumps `0.3.0 → 0.4.0`, a
+  feature/fix bumps the patch). Declaring `1.0.0` — the act that defines your
+  stable API (§5) — is always yours, never the robot's.
+- **Pre-releases bump from their base.** `1.4.3rc1` is read as base `1.4.3`:
+  a patch-level change lands on `1.4.4`, a breaking change on `2.0.0`.
+  semverer accepts rc/dev/post suffixes but never iterates their counters —
+  the next version is always a real one.
 
 ### Several packages in one distribution
 
@@ -145,6 +149,13 @@ on every member; `--member <name>` limits to one:
 [tool.semverer]
 members = ["packages/foo", "packages/bar"]
 ```
+
+Without a root config, discovery is bounded by design: the top level, then
+exactly **one** directory level deeper (each subdirectory with its own
+versioned `pyproject.toml` becomes a member — handy for polyglot monorepos
+with no Python root). Anything more nested must be named explicitly via
+`members`, a path argument, or `--pyproject`; if nothing is found, semverer
+says so and asks you to specify the project rather than guessing.
 
 Each member is itself classic or a `packages` Layout-A unit, and may set
 `tag_pattern` (with a `{name}` placeholder, default `v*`) so `audit --tags-only`

@@ -145,13 +145,13 @@ Feature: Auditing version history against the semver rules
     Then the command exits with code 1
     And the output contains "UNDER-BUMPED"
 
-  Scenario: A breaking change during a pre-release only advances the counter
+  Scenario: A breaking change on a release candidate bumps from its base version
     Given a git-tracked project
     And a commit at version "1.0.0rc1" with module "core.py":
       """
       def f(a): ...
       """
-    And a commit at version "1.0.0rc2" with module "core.py":
+    And a commit at version "2.0.0" with module "core.py":
       """
       def f(a, b): ...
       """

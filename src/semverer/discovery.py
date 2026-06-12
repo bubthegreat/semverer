@@ -23,6 +23,7 @@ from pathlib import Path
 from tomlkit import TOMLDocument
 
 from semverer import storage
+from semverer.files import IGNORED_DIRS
 
 
 class DiscoveryError(Exception):
@@ -45,16 +46,25 @@ def discover(
     pyproject_option: Path | None = None,
     package_path: str | None = None,
 ) -> list[Target]:
-    """Resolve ``root`` (or an explicit ``--pyproject``) into version targets."""
+    """Resolve ``root`` (or an explicit ``--pyproject``) into version targets.
+
+    Search depth is bounded by design: the top level, then exactly one
+    directory level deeper (PRINCIPLES.md, bounded scope). Anything more
+    nested must be named explicitly — via ``[tool.semverer] members``, a
+    package path argument, or ``--pyproject``.
+    """
     pyproject = pyproject_option or storage.find_pyproject(root)
-    if pyproject is None or not pyproject.is_file():
-        raise DiscoveryError("no pyproject.toml found")
-    doc = storage.load(pyproject)
 
     # An explicit path or pyproject forces the legacy single-target path,
     # bypassing members so existing single-package behavior is bit-for-bit.
     if package_path is not None or pyproject_option is not None:
-        return [_resolve_one(pyproject, doc, package_path)]
+        if pyproject is None or not pyproject.is_file():
+            raise DiscoveryError("no pyproject.toml found")
+        return [_resolve_one(pyproject, storage.load(pyproject), package_path)]
+
+    if pyproject is None:
+        return _discover_one_deep(root)
+    doc = storage.load(pyproject)
 
     members = storage.read_members_config(doc)
     if members:
@@ -64,7 +74,45 @@ def discover(
             )
         return _discover_members(pyproject, members)
 
+    if _is_tooling_only(doc):
+        # A version-less pyproject (lint/format config only) is not a
+        # package; look one level deeper before giving up.
+        return _discover_one_deep(pyproject.parent)
+
     return [_resolve_one(pyproject, doc, None)]
+
+
+def _is_tooling_only(doc: TOMLDocument) -> bool:
+    """No version, no dynamic version, and no semverer package config."""
+    return (
+        storage.read_version(doc) is None
+        and "version" not in doc.get("project", {}).get("dynamic", [])
+        and storage.read_package_config(doc) is None
+        and not storage.read_packages_config(doc)
+    )
+
+
+def _discover_one_deep(root: Path) -> list[Target]:
+    """Find member projects exactly one directory level down — and no further.
+
+    Only directories with their own ``pyproject.toml`` carrying a version
+    count as clear packages; version-less ones (tooling config) are skipped.
+    """
+    targets: list[Target] = []
+    for member_pyproject in sorted(root.glob("*/pyproject.toml")):
+        if member_pyproject.parent.name in IGNORED_DIRS:
+            continue
+        member_doc = storage.load(member_pyproject)
+        if storage.read_version(member_doc) is None:
+            continue  # not a clear package
+        targets.append(_resolve_one(member_pyproject, member_doc, None))
+    if not targets:
+        raise DiscoveryError(
+            "no clear Python package found at the top level or one level deep; "
+            "to use semverer here, specify the project: pass a package path or "
+            "--pyproject, or list [tool.semverer] members in a root pyproject.toml"
+        )
+    return targets
 
 
 def _discover_members(controlling: Path, members: list[str]) -> list[Target]:

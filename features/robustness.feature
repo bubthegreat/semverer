@@ -19,7 +19,7 @@ Feature: Robust handling of broken or unsupported input
     And the output contains "broken.py"
     And the project version remains "1.0.0"
 
-  Scenario: A non-PEP-440 project version is rejected with guidance
+  Scenario: A version that cannot resolve to semver is rejected with guidance
     Given a project at version "not.a.version"
     And a module "core.py" containing:
       """
@@ -27,7 +27,27 @@ Feature: Robust handling of broken or unsupported input
       """
     When I run "semverer init"
     Then the command exits with code 2
-    And the output contains "not a valid PEP 440 version"
+    And the output contains "does not follow the semver spec"
+
+  Scenario: An epoch version is outside the semver spec
+    Given a project at version "1!1.2.3"
+    And a module "core.py" containing:
+      """
+      def greet(name): ...
+      """
+    When I run "semverer init"
+    Then the command exits with code 2
+    And the output contains "does not follow the semver spec"
+
+  Scenario: A two-component version is moved onto MAJOR.MINOR.PATCH at init
+    Given a project at version "1.4"
+    And a module "core.py" containing:
+      """
+      def greet(name): ...
+      """
+    When I run "semverer init"
+    Then the command exits with code 0
+    And the project version becomes "1.4.0"
 
   Scenario: Dynamic versioning is named explicitly as unsupported
     Given a project with a dynamic version
