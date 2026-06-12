@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import tomlkit
 from pytest_bdd import given, parsers, then, when
 
@@ -64,13 +62,6 @@ def commit_at_version(project: Project, version: str, name: str, docstring: str)
 @given(parsers.parse('the commit is tagged "{tag}"'))
 def commit_tagged(project: Project, tag: str):
     project.git("tag", tag)
-
-
-@given("the baseline was hashed under a different Python version")
-def baseline_under_different_python(project: Project):
-    doc = project.read_pyproject()
-    doc["tool"]["semverer"]["baseline"]["python"] = "0.0"
-    project.pyproject.write_text(tomlkit.dumps(doc))
 
 
 @given(parsers.parse('the baseline version is corrupted to "{value}"'))
@@ -154,14 +145,6 @@ def assert_comments_preserved(project: Project):
     text = project.pyproject.read_text()
     assert "# managed by mypkg maintainers" in text
     assert "# semverer configuration" in text
-
-
-@then("the baseline records the running Python version")
-def assert_baseline_python(project: Project):
-    baseline = project.read_baseline()
-    assert baseline is not None, "no baseline stored"
-    expected = f"{sys.version_info.major}.{sys.version_info.minor}"
-    assert str(baseline["python"]) == expected
 
 
 @then("the skill file exists in the project")

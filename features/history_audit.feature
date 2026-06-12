@@ -59,13 +59,13 @@ Feature: Auditing version history against the semver rules
     Then the command exits with code 0
     And the output contains "over-bumped"
 
-  Scenario: Commits without API or version changes are not reported
+  Scenario: A comment-only commit needs a patch bump like any other change
     Given a git-tracked project
     And a commit at version "1.0.0" with module "core.py":
       """
       def f(a): ...
       """
-    And a commit at version "1.0.0" with module "core.py":
+    And a commit at version "1.0.1" with module "core.py":
       """
       # only a comment was added
       def f(a): ...
@@ -114,6 +114,64 @@ Feature: Auditing version history against the semver rules
     When I run "semverer audit --since adoption"
     Then the command exits with code 0
     And the output contains "audit passed"
+
+  Scenario: A breaking change on a 0.x line only needs a minor bump
+    Given a git-tracked project
+    And a commit at version "0.3.0" with module "core.py":
+      """
+      def f(a): ...
+      """
+    And a commit at version "0.4.0" with module "core.py":
+      """
+      def f(a, b): ...
+      """
+    When I run "semverer audit"
+    Then the command exits with code 0
+    And the output contains "audit passed"
+    And the output contains "relaxed to minor"
+
+  Scenario: A 0.x line that under-bumps a breaking change is still a violation
+    Given a git-tracked project
+    And a commit at version "0.3.0" with module "core.py":
+      """
+      def f(a): ...
+      def g(): ...
+      """
+    And a commit at version "0.3.1" with module "core.py":
+      """
+      def f(a): ...
+      """
+    When I run "semverer audit"
+    Then the command exits with code 1
+    And the output contains "UNDER-BUMPED"
+
+  Scenario: A breaking change during a pre-release only advances the counter
+    Given a git-tracked project
+    And a commit at version "1.0.0rc1" with module "core.py":
+      """
+      def f(a): ...
+      """
+    And a commit at version "1.0.0rc2" with module "core.py":
+      """
+      def f(a, b): ...
+      """
+    When I run "semverer audit"
+    Then the command exits with code 0
+    And the output contains "audit passed"
+
+  Scenario: A version that moves backwards is a violation
+    Given a git-tracked project
+    And a commit at version "2.0.0" with module "core.py":
+      """
+      def f(a): ...
+      """
+    And a commit at version "1.0.0" with module "core.py":
+      """
+      def f(a): ...
+      """
+    When I run "semverer audit"
+    Then the command exits with code 1
+    And the output contains "WENT BACKWARDS"
 
   Scenario: Outside a git repository the error is clear
     Given a project at version "1.0.0"

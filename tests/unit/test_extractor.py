@@ -8,7 +8,6 @@ import pytest
 from semverer.extractor import (
     extract_module_api,
     extract_package,
-    hash_module,
     parse_signature,
 )
 from semverer.models import ClassSig, FunctionSig, ParamKind
@@ -111,33 +110,30 @@ class TestPackageScanning:
 
     def test_keys_are_relative_posix(self, tmp_path):
         package = self.make_package(tmp_path, {"core.py": "def go(): ..."})
-        api, hashes = extract_package(package)
+        api = extract_package(package)
         assert api == {"mypkg/core.py::go": "def go()"}
-        assert set(hashes) == {"mypkg/core.py"}
 
     def test_init_module_included(self, tmp_path):
         package = self.make_package(tmp_path, {"__init__.py": "def public(): ..."})
-        api, _ = extract_package(package)
+        api = extract_package(package)
         assert api == {"mypkg/__init__.py::public": "def public()"}
 
-    def test_private_module_hashed_but_not_in_api(self, tmp_path):
+    def test_private_module_not_in_api(self, tmp_path):
         package = self.make_package(tmp_path, {"_internal.py": "def helper(): ..."})
-        api, hashes = extract_package(package)
-        assert api == {}
-        assert "mypkg/_internal.py" in hashes
+        assert extract_package(package) == {}
 
     def test_subpackages_scanned(self, tmp_path):
         package = self.make_package(
             tmp_path, {"sub/__init__.py": "", "sub/feature.py": "def f(): ..."}
         )
-        api, _ = extract_package(package)
+        api = extract_package(package)
         assert "mypkg/sub/feature.py::f" in api
 
     def test_bom_prefixed_file_parses(self, tmp_path):
         package = tmp_path / "mypkg"
         package.mkdir()
         (package / "core.py").write_bytes(b"\xef\xbb\xbfdef go(): ...\n")
-        api, _ = extract_package(package)
+        api = extract_package(package)
         assert api == {"mypkg/core.py::go": "def go()"}
 
     def test_pycache_ignored(self, tmp_path):
@@ -145,46 +141,8 @@ class TestPackageScanning:
             tmp_path,
             {"core.py": "def go(): ...", "__pycache__/junk.py": "def junk(): ..."},
         )
-        api, hashes = extract_package(package)
+        api = extract_package(package)
         assert list(api) == ["mypkg/core.py::go"]
-        assert list(hashes) == ["mypkg/core.py"]
-
-
-class TestHashing:
-    def test_comments_and_formatting_do_not_change_hash(self):
-        a = ast.parse("def f(a):\n    return a + 1\n")
-        b = ast.parse("# comment\ndef f(a):\n\n    return (a + 1)\n")
-        assert hash_module(a) == hash_module(b)
-
-    def test_body_change_changes_hash(self):
-        a = ast.parse("def f(a):\n    return a + 1\n")
-        b = ast.parse("def f(a):\n    return a + 2\n")
-        assert hash_module(a) != hash_module(b)
-
-    def test_string_quote_style_does_not_change_hash(self):
-        a = ast.parse("""x = f"a{', '.join(y)}b"\n""")
-        b = ast.parse("""x = f'a{", ".join(y)}b'\n""")
-        assert hash_module(a) == hash_module(b)
-
-    def test_fstring_content_change_changes_hash(self):
-        a = ast.parse('x = f"a{y}"\n')
-        b = ast.parse('x = f"b{y}"\n')
-        assert hash_module(a) != hash_module(b)
-
-    def test_redundant_parens_do_not_change_hash(self):
-        a = ast.parse("x = (1, 2)\ny = a + b * c\n")
-        b = ast.parse("x = 1, 2\ny = a + (b * c)\n")
-        assert hash_module(a) == hash_module(b)
-
-    def test_annotation_change_changes_hash(self):
-        a = ast.parse("def f(a: int) -> str: ...")
-        b = ast.parse("def f(a: str) -> int: ...")
-        assert hash_module(a) != hash_module(b)
-
-    def test_default_value_change_changes_hash(self):
-        a = ast.parse("def f(a=1): ...")
-        b = ast.parse("def f(a=2): ...")
-        assert hash_module(a) != hash_module(b)
 
 
 class TestParseSignature:

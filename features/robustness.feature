@@ -19,15 +19,15 @@ Feature: Robust handling of broken or unsupported input
     And the output contains "broken.py"
     And the project version remains "1.0.0"
 
-  Scenario: A non-semver project version is rejected with guidance
-    Given a project at version "1.0"
+  Scenario: A non-PEP-440 project version is rejected with guidance
+    Given a project at version "not.a.version"
     And a module "core.py" containing:
       """
       def greet(name): ...
       """
     When I run "semverer init"
     Then the command exits with code 2
-    And the output contains "not a valid semantic version"
+    And the output contains "not a valid PEP 440 version"
 
   Scenario: Dynamic versioning is named explicitly as unsupported
     Given a project with a dynamic version

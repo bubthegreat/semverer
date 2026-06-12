@@ -105,7 +105,7 @@ Feature: Version bumping based on detected API changes
     And I run "semverer update"
     Then the project version becomes "1.2.4"
 
-  Scenario: Comment and formatting changes require no bump
+  Scenario: Comment and formatting changes are a patch change
     Given a project at version "1.2.3"
     And a module "core.py" containing:
       """
@@ -121,8 +121,8 @@ Feature: Version bumping based on detected API changes
           return (name)
       """
     And I run "semverer update"
-    Then the project version remains "1.2.3"
-    And the command exits with code 0
+    Then the project version becomes "1.2.4"
+    And the output contains "contents changed"
 
   Scenario: Adding a new module with public API is a minor change
     Given a project at version "1.2.3"
@@ -235,3 +235,26 @@ Feature: Version bumping based on detected API changes
       | before                  | after                      | version |
       | def f(a): return 1      | def f(a): return 2         | 1.0.1   |
       | def f(*args): return 1  | def f(*items): return 1    | 1.0.1   |
+
+  Scenario Outline: Relaxed bumps for unstable (0.x and pre-release) versions
+    Given a project at version "<start>"
+    And a module "api.py" with source "<before>"
+    And a baseline has been established
+    When the module "api.py" is changed to source "<after>"
+    And I run "semverer update"
+    Then the project version becomes "<version>"
+
+    Examples: 0.x demotes severity one level (the leading zero never auto-bumps)
+      | start | before        | after              | version |
+      | 0.3.0 | def f(a): ... | def f(a, b): ...   | 0.4.0   |
+      | 0.3.0 | def f(a): ... | def f(a, b=1): ... | 0.3.1   |
+      | 0.3.0 | def f(a): ... | def f(a): return 9 | 0.3.1   |
+      | 0.0.3 | def f(a): ... | def f(a, b): ...   | 0.1.0   |
+      | 0.0.3 | def f(a): ... | def f(a, b=1): ... | 0.0.4   |
+
+    Examples: Pre-release and dev versions only advance their counter
+      | start        | before        | after            | version      |
+      | 1.0.0rc1     | def f(a): ... | def f(a, b): ... | 1.0.0rc2     |
+      | 1.0.0rc1     | def f(a): ... | def f(a, b=1):...| 1.0.0rc2     |
+      | 1.0.0a1      | def f(a): ... | def f(a, b): ... | 1.0.0a2      |
+      | 1.0.0.dev1   | def f(a): ... | def f(a, b): ... | 1.0.0.dev2   |

@@ -29,13 +29,14 @@ semver bump from changes to the package's public API (detected via AST).
 
 ## How to work in a semverer-managed package
 
-- After changing Python source, run `semverer check` to see the impact;
+- After changing the project, run `semverer check` to see the impact;
   run `semverer update` before committing so the version and baseline stay
-  in sync with the code.
+  in sync with the tree.
 - Never hand-edit `[tool.semverer.baseline]`; it is machine-managed.
 - Do not hand-bump the version for API changes — semverer computes it.
   A hand-made bump at least as large as required is respected, not
   double-bumped.
-- Severity rules: removing/breaking public signatures = major; adding
-  public API or optional parameters = minor; implementation-only changes
-  = patch; comment/formatting-only changes = no bump.
+- Severity rules: the importable surface is the only public API. Breaking
+  public signatures = major; adding public API = minor; everything else
+  that ships (implementation, docs, comments, dependencies, entry points,
+  packaging metadata) = patch. See PRINCIPLES.md in the semverer repo.

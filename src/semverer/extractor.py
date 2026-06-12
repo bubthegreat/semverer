@@ -9,8 +9,7 @@ through :func:`ast.parse` for structural comparison.
 from __future__ import annotations
 
 import ast
-import hashlib
-import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 from semverer.models import ClassSig, FunctionSig, Param, ParamKind
@@ -18,19 +17,59 @@ from semverer.models import ClassSig, FunctionSig, Param, ParamKind
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
 
-def extract_package(package_path: Path) -> tuple[dict[str, str], dict[str, str]]:
-    """Scan a package directory and return its ``(api, hashes)`` snapshot.
+class DuplicateModuleError(Exception):
+    """Two scanned package directories map to the same module key.
 
-    ``api`` maps ``"module.py::Symbol"`` / ``"module.py::Class.method"`` keys to
-    canonical signature strings. ``hashes`` maps every module (public or
-    private) to a hash of its normalized AST, so implementation-only changes
-    can still be detected as patch-level. Module keys are relative to the
-    package's parent directory, in posix form, so baselines are portable.
+    Keys are prefixed by the *leaf* directory name, so ``src/foo`` and
+    ``vendored/foo`` would both yield ``foo/...`` keys and silently clobber
+    each other. We refuse rather than drop symbols.
     """
+
+    def __init__(self, key: str, first: Path, second: Path) -> None:
+        self.key = key
+        self.first = first
+        self.second = second
+        super().__init__(
+            f"packages {first} and {second} both map to module {key!r}; "
+            "rename one of them or use [tool.semverer] members for independent versioning"
+        )
+
+
+def extract_package(package_path: Path) -> dict[str, str]:
+    """Scan one package directory and return its public API snapshot.
+
+    Thin wrapper over :func:`extract_packages` for the single-directory case.
+    """
+    return extract_packages([package_path])
+
+
+def extract_packages(package_paths: Iterable[Path]) -> dict[str, str]:
+    """Scan several package directories into one public API snapshot.
+
+    The result maps ``"module.py::Symbol"`` / ``"module.py::Class.method"``
+    keys to canonical signature strings. Module keys are relative to each
+    directory's *parent*, in posix form, so baselines are portable and several
+    importable packages in one distribution union cleanly. Colliding keys
+    across directories raise :class:`DuplicateModuleError`. Implementation
+    changes are detected separately, by content-hashing the whole tree (see
+    :mod:`semverer.files`).
+    """
+    sources: dict[str, str] = {}
+    origin: dict[str, Path] = {}
+    for package_path in package_paths:
+        for module_key, text in _collect_sources(package_path).items():
+            if module_key in sources:
+                raise DuplicateModuleError(module_key, origin[module_key], package_path)
+            sources[module_key] = text
+            origin[module_key] = package_path
+    return extract_sources(sources)
+
+
+def _collect_sources(package_path: Path) -> dict[str, str]:
+    """Read one package directory's ``.py`` files keyed parent-relative."""
     package_path = package_path.resolve()
     root = package_path.parent
     sources: dict[str, str] = {}
-
     for file in sorted(package_path.rglob("*.py")):
         relative_parts = file.relative_to(package_path).parts
         if any(part == "__pycache__" or part.startswith(".") for part in relative_parts[:-1]):
@@ -39,76 +78,27 @@ def extract_package(package_path: Path) -> tuple[dict[str, str], dict[str, str]]
         # utf-8-sig: tolerate a BOM (some Windows editors add one); plain
         # utf-8 files decode identically under it.
         sources[module_key] = file.read_text(encoding="utf-8-sig")
+    return sources
 
-    return extract_sources(sources)
 
-
-def extract_sources(sources: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
-    """Snapshot a package given as in-memory sources keyed by module key.
+def extract_sources(sources: dict[str, str]) -> dict[str, str]:
+    """Extract the public API from in-memory sources keyed by module key.
 
     This is the filesystem-free core of :func:`extract_package`; the audit
     command uses it to snapshot historical commits directly from git blobs
     without checking them out.
     """
     api: dict[str, str] = {}
-    hashes: dict[str, str] = {}
 
     for module_key in sorted(sources):
         tree = ast.parse(sources[module_key], filename=module_key)
-        hashes[module_key] = hash_module(tree)
         name = module_key.rsplit("/", 1)[-1]
         if name.startswith("_") and name != "__init__.py":
             continue
         for symbol, signature in extract_module_api(tree).items():
             api[f"{module_key}::{symbol}"] = signature
 
-    return api, hashes
-
-
-def hash_module(tree: ast.Module) -> str:
-    """Hash of the module's code with comments/formatting normalized away.
-
-    The hash covers a canonical structural serialization of the AST rather
-    than ast.unparse text: the unparser's rendering rules differ between
-    Python minor versions (e.g. 3.12 emits PEP 701 quote-reuse f-strings
-    where 3.14 switches the outer quotes), so identical source can unparse
-    to different text under different interpreters and produce phantom
-    patch-level findings. Structure is what we actually care about, and it
-    is far more stable across versions. The baseline still records
-    :func:`running_python` so a residual cross-version drift (e.g. a future
-    minor changing AST shape for existing syntax) can be flagged to the user
-    instead of silently mis-bumping.
-    """
-    return "sha256:" + hashlib.sha256(_stable_dump(tree).encode("utf-8")).hexdigest()
-
-
-def _stable_dump(node: object) -> str:
-    """Serialize an AST so equal structure gives equal text across Pythons.
-
-    Deviations from ast.dump, each in service of cross-version stability:
-    - position attributes (lineno/col_offset/...) are never included;
-    - fields that are None or empty lists are omitted, so a new optional
-      field added in a future Python (like 3.12's type_params) hashes the
-      same as the field not existing at all;
-    - field names are emitted sorted, so reordering of _fields between
-      versions cannot change the output.
-    """
-    if isinstance(node, ast.AST):
-        parts = []
-        for name in sorted(node._fields):
-            value = getattr(node, name, None)
-            if value is None or (isinstance(value, list) and not value):
-                continue
-            parts.append(f"{name}={_stable_dump(value)}")
-        return f"{type(node).__name__}({', '.join(parts)})"
-    if isinstance(node, list):
-        return f"[{', '.join(_stable_dump(item) for item in node)}]"
-    return repr(node)
-
-
-def running_python() -> str:
-    """The interpreter minor version that produced this process's hashes."""
-    return f"{sys.version_info.major}.{sys.version_info.minor}"
+    return api
 
 
 def extract_module_api(tree: ast.Module) -> dict[str, str]:

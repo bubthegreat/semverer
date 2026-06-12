@@ -52,7 +52,12 @@ patch-level implementation change, not an API change.)
 | New parameter with a default; new `*args`/`**kwargs` | **minor** |
 | Parameter gains a default; base class added | **minor** |
 | Implementation changed, public API identical (incl. private code) | **patch** |
-| Comments/formatting only | none |
+| Any other change to a tracked file (docs, data, CI config, comments/formatting) | **patch** |
+| Packaging metadata changed (dependencies, entry points, extras, requires-python, name) | **patch** |
+
+Only the importable surface can drive major or minor; everything else the
+project ships is patch at most. The reasoning behind every rule lives in
+[PRINCIPLES.md](PRINCIPLES.md).
 
 **Public API** = top-level functions and classes (and their methods) whose
 names don't start with `_`, in modules whose names don't start with `_` —
@@ -63,14 +68,17 @@ runtime compatibility).
 The full executable specification lives in [`features/`](features/) as
 Gherkin scenarios, bound to tests with pytest-bdd.
 
-> **Note:** implementation hashes come from a canonical structural
-> serialization of the AST, designed to be stable across Python minor
-> versions (rendered text like `ast.unparse` is not — f-string quoting
-> changed in 3.12, for example). The baseline records which interpreter
-> wrote it (`python = "3.14"`); if a future Python ever changes AST shape
-> for existing syntax, patch findings made under a mismatched interpreter
-> are annotated with a note suggesting `semverer init` under the project's
-> pinned Python.
+> **What counts as a change:** the public API decides between major and
+> minor; everything else decides whether a patch is due. The whole project
+> tree is content-hashed into the baseline (built-in ignores: `.git`,
+> `__pycache__`, `.venv`, `dist`, `build`, caches, `*.egg-info`), so no
+> commit that changes the project can ship without moving the version. Two
+> files are deliberately untracked because semverer rewrites them itself:
+> `pyproject.toml` (its packaging fields — name, dependencies,
+> requires-python, extras, entry points — are compared field-by-field
+> instead, all patch-level) and `uv.lock`. Narrow the scan with
+> `[tool.semverer] track_files = false` (package dirs only) or
+> `exclude = ["notes/*", ...]` globs.
 
 ## Install
 
@@ -101,6 +109,47 @@ semverer check src/mypkg --pyproject path/to/pyproject.toml
 Exit codes follow the pre-commit convention: `0` nothing to do, `1` action
 needed / files modified, `2` configuration error.
 
+### Version formats
+
+Versions are [PEP 440](https://peps.python.org/pep-0440/) — the scheme pip and
+PyPI use — so pre-releases (`1.2.3rc1`), dev releases (`1.2.3.dev1`), post
+releases (`1.2.3.post1`), epochs (`1!1.2.3`) and local versions (`1.2.3+local`)
+are all understood. Two relaxations match the wider ecosystem's expectations:
+
+- **`0.x` is unstable.** The leading zero never auto-increments; severity is
+  demoted one level (a breaking change bumps `0.3.0 → 0.4.0`, a feature/fix
+  bumps the patch). This is the Cargo "left-most non-zero" convention.
+- **Pre-releases stay pre-releases.** While the version is a pre-release or dev
+  release, any change just advances its counter (`1.0.0rc1 → 1.0.0rc2`); only
+  forward movement is enforced.
+
+### Several packages in one distribution
+
+If a single distribution ships more than one importable package, list them
+with `packages`; their APIs are unioned into one baseline and share the one
+`[project].version`:
+
+```toml
+[tool.semverer]
+packages = ["src/foo", "src/bar"]
+```
+
+### Monorepos (independently-versioned members)
+
+For a monorepo where each subproject has its own `pyproject.toml` and version,
+list the members at the repo root. `check`/`update`/`init`/`audit` then operate
+on every member; `--member <name>` limits to one:
+
+```toml
+# ./pyproject.toml  (the workspace root)
+[tool.semverer]
+members = ["packages/foo", "packages/bar"]
+```
+
+Each member is itself classic or a `packages` Layout-A unit, and may set
+`tag_pattern` (with a `{name}` placeholder, default `v*`) so `audit --tags-only`
+finds its release tags — e.g. `tag_pattern = "{name}-v*"` matches `foo-v1.2.0`.
+
 If you bump the version by hand, semverer respects it: a manual bump at least
 as large as the required severity is accepted instead of bumped again.
 
@@ -108,17 +157,22 @@ as large as the required severity is accepted instead of bumped again.
 
 ```bash
 semverer audit                      # every commit on the current branch
-semverer audit --tags-only          # only published v* release tags
+semverer audit --tags-only          # only published release tags (v* by default)
 semverer audit --since v1.4.0      # from an adoption point forward
 ```
 
 `audit` replays your git history: for each pair of consecutive commits (or
-tags), it extracts both API snapshots directly from the git blobs and checks
-that the recorded version moved at least as far as the rules require. Under-
-bumps are violations (exit 1); over-bumps are allowed and noted. Run it
-before `init` on an existing project to see how honest your versions have
-been — and run it in CI like this repo does (`semverer audit --tags-only`),
-where semverer's own published tags are its permanent integration test.
+tags), it extracts both snapshots directly from the git blobs and checks
+that the recorded version moved at least as far as the rules require —
+exactly the rules `check`/`update` apply, nothing more. History is read
+through the current layout; refs that predate it are skipped with a reason,
+and a run that cannot evaluate a single transition fails loudly instead of
+passing vacuously (start from the adoption point with `--since` for older
+histories). Under-bumps and backward version moves are violations (exit 1);
+over-bumps are allowed and noted. Run it before `init` on an existing
+project to see how honest your versions have been — and run it in CI like
+this repo does (`semverer audit --tags-only`), where semverer's own
+published tags are its permanent integration test.
 
 ```
   v0.1.0..v0.2.0: required minor, version 0.1.0 -> 0.2.0  OK
@@ -149,8 +203,8 @@ version bump could land alongside failing tests. This repo's own
 ## As a Claude Code skill
 
 ```bash
-semverer skill install          # into this project's .claude/skills/
-semverer skill install --user   # into ~/.claude/skills/ for all projects
+semverer skill install            # into ~/.claude/skills/ for all projects (default)
+semverer skill install --project  # into this project's .claude/skills/
 ```
 
 Claude Code then knows to run `semverer check`/`update` whenever it changes
@@ -158,13 +212,11 @@ Python code in a semverer-managed package.
 
 ## Known limitations (v1)
 
-- **Literal `[project] version` required.** Dynamic versioning
-  (`dynamic = ["version"]`, hatch-vcs, setuptools-scm) and Poetry's
-  `[tool.poetry]` metadata are not supported; semverer needs a version field
-  it can read and rewrite. Versions must be valid semver
-  (`MAJOR.MINOR.PATCH` — calver like `2026.1` is rejected with a clear error).
-- **One package per pyproject.** Monorepos with several published packages
-  under one `pyproject.toml` are out of scope.
+- **A literal version field is required.** semverer reads and rewrites the
+  version, so dynamic versioning (`dynamic = ["version"]`, hatch-vcs,
+  setuptools-scm) is rejected with a clear error. Both `[project].version` and
+  the legacy `[tool.poetry].version` are supported. Versions must be valid
+  PEP 440 (calver like `2026.1` is accepted; arbitrary strings are rejected).
 - **Only statically visible definitions are API.** Symbols defined inside
   `if`/`try` blocks (e.g. `TYPE_CHECKING` stubs, import fallbacks), lambdas
   assigned to names, and anything built dynamically are invisible to

@@ -16,19 +16,16 @@ from semverer.models import (
 def compare(
     old_api: dict[str, str],
     new_api: dict[str, str],
-    old_hashes: dict[str, str],
-    new_hashes: dict[str, str],
-    *,
-    compare_hashes: bool = True,
+    old_files: dict[str, str],
+    new_files: dict[str, str],
 ) -> list[Change]:
     """Return all changes between baseline and current snapshots.
 
     The required version bump is the maximum severity across the result.
-
-    ``compare_hashes=False`` disables hash-based patch detection, for callers
-    that cannot trust the provenance of the stored hashes (they are stable
-    across Python minors by design — see extractor.hash_module — but that
-    cannot be guaranteed for interpreters newer than this code).
+    ``old_files``/``new_files`` map tracked file paths to content hashes; any
+    file-level difference is at least a patch, unless that file's API diff is
+    already reported (a module's signature change subsumes its content
+    change).
     """
     changes: list[Change] = []
 
@@ -52,29 +49,36 @@ def compare(
             continue
         severity, details = classify_signature_change(old_api[key], new_api[key])
         if severity is Severity.NONE:
-            continue  # caller-invisible change (e.g. *args renamed); hash check below
+            continue  # caller-invisible change (e.g. *args renamed); file check below
         changes.append(Change(severity, key, "; ".join(details)))
 
-    if not compare_hashes:
-        return changes
-
     api_changed_modules = {change.module for change in changes}
-    for module in sorted(old_hashes.keys() | new_hashes.keys()):
-        if module in api_changed_modules:
-            continue
-        old_hash = old_hashes.get(module)
-        new_hash = new_hashes.get(module)
+    for path in sorted(old_files.keys() | new_files.keys()):
+        old_hash = old_files.get(path)
+        new_hash = new_files.get(path)
         if old_hash == new_hash:
             continue
+        if any(_covers(module, path) for module in api_changed_modules):
+            continue
         if old_hash is None:
-            description = "module added (no public API)"
+            description = "file added"
         elif new_hash is None:
-            description = "module removed (no public API)"
+            description = "file removed"
         else:
-            description = "implementation changed (public API unchanged)"
-        changes.append(Change(Severity.PATCH, module, description))
+            description = "contents changed"
+        changes.append(Change(Severity.PATCH, path, description))
 
     return changes
+
+
+def _covers(module_key: str, path: str) -> bool:
+    """Whether an API module key refers to this file path.
+
+    API keys are relative to the package's parent (``pkg/mod.py``) while file
+    paths are relative to the project root (``src/pkg/mod.py``), so the module
+    key is always a path suffix of its file.
+    """
+    return path == module_key or path.endswith(f"/{module_key}")
 
 
 def classify_signature_change(old: str, new: str) -> tuple[Severity, list[str]]:
